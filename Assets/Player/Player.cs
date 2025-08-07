@@ -3,6 +3,7 @@ using Common;
 using EzySlice;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Plane = UnityEngine.Plane;
 
 public class Player : MonoBehaviour {
   [SerializeField] private float moveSpeed = 5;
@@ -82,9 +83,9 @@ public class Player : MonoBehaviour {
     charController.Move(moveWorld * Time.deltaTime);
 
     // --- DEBUG ---
-    Debug.DrawRay(transform.position, sliceStartDir, Color.green);
-    Debug.DrawRay(transform.position, sliceEndDir, Color.red);
-    Debug.DrawRay(transform.position, planeNormal, Color.yellow);
+    Debug.DrawRay(lastDebugPos, sliceStartDir, Color.green);
+    Debug.DrawRay(lastDebugPos, sliceEndDir, Color.red);
+    Debug.DrawRay(lastDebugPos, planeNormal, Color.yellow);
   }
 
   void AltFireDown(InputAction.CallbackContext context) {
@@ -104,43 +105,55 @@ public class Player : MonoBehaviour {
   }
 
   void ShootDown(InputAction.CallbackContext context) {
-    if (!isAiming) {
-      return;
-    }
-    sliceStart = Camera.main.ScreenToWorldPoint(new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 7f));
-    sliceStartDir = sliceStart - transform.position;
+    if (!isAiming) return;
+    var mainCam = Camera.main;
+    if (mainCam == null) return;
+    
+    Vector3 pos = aimCamera.transform.position;
+    sliceStart = mainCam.ScreenToWorldPoint(new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 7f));
+    sliceStartDir = sliceStart - pos;
   }
 
   private Vector3 planeNormal;
+  private Vector3 lastDebugPos;
 
   void ShootRelease(InputAction.CallbackContext context) {
-    if (!isAiming) {
-      return;
-    }
-
-    // todo this calculation is not really correct
-    Vector3 pos = transform.position;
-    sliceEnd = Camera.main.ScreenToWorldPoint(new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 7f));
+    if (!isAiming) return;
+    var mainCam = Camera.main;
+    if (mainCam == null) return;
+    
+    Vector3 pos = mainCam.transform.position;
+    lastDebugPos = pos;
+    sliceEnd = mainCam.ScreenToWorldPoint(new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 7f));
     sliceEndDir = sliceEnd - pos;
 
     planeNormal = Vector3.Cross(sliceStartDir, sliceEndDir).normalized;
     Vector3 pointOnPlane = pos;
-
-    GameObject[] slices = enemy.SliceInstantiate(pointOnPlane, planeNormal);
-    if (slices == null) {
+    Plane slicePlane = new Plane(planeNormal, pointOnPlane);
+    
+    GameObject[] enemyParts = enemy.SliceInstantiate(pointOnPlane, planeNormal);
+    if (enemyParts == null) {
       Debug.LogWarning("Empty parts for slice");
       return;
     }
-    Debug.Log(slices.Length);
-    // GameObject[] slices = enemy.SliceInstantiate(new Vector3(0f, 1f, 0f), Vector3.up);
     enemy.SetActive(false);
-    for (int i = 0; i < slices.Length; i++) {
-      var slice = slices[i];
+    for (int i = 0; i < enemyParts.Length; i++) {
+      var slice = enemyParts[i];
       slice.AddComponent<MeshCollider>().convex = true;
       var rb = slice.AddComponent<Rigidbody>();
-      Vector3 force = (rb.position - transform.position) * 0.5f;
-      // todo calculate cleaving (vertical) force based on vector from slice point on enemy to section position
-      force.y = i == 0 ? 1 : -1;
+      
+      Vector3 frontForce = (rb.position - mainCamera.transform.position) * 0.5f;
+      Vector3 force = frontForce;
+      float verticalScalar = 2f;
+      // var isPositiveSide = slicePlane.GetSide(rb.position); rb.position is identical for parts for some reason (takes a frame?)
+      if (i == 0) { // Above plane
+        force += planeNormal * verticalScalar;
+      } else if (i == 1) { // Below plane
+        force = -planeNormal * verticalScalar;
+      }
+      Debug.Log((i == 0) + " part_position=" + rb.position + " normal=" + planeNormal);
+      Debug.Log("[" + i + "] = " + force);
+      
       rb.AddForce(force, ForceMode.Impulse);
     }
   }
