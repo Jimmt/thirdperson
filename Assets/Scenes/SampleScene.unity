@@ -131,7 +131,7 @@ GameObject:
   - component: {fileID: 142012975}
   - component: {fileID: 142012974}
   - component: {fileID: 142012973}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Cube
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -796,7 +796,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  - {fileID: 2100000, guid: f3ea691b922f1504987626fc528384ba, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -854,7 +854,7 @@ GameObject:
   - component: {fileID: 1099616708}
   - component: {fileID: 1099616707}
   - component: {fileID: 1099616711}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Enemy
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -907,7 +907,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 31321ba15b8f8eb4c954353edc038b1d, type: 2}
+  - {fileID: 2100000, guid: a7619319c69e3454c9e7dfcc57795804, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1073,7 +1073,7 @@ GameObject:
   - component: {fileID: 1259356668}
   - component: {fileID: 1259356667}
   - component: {fileID: 1259356672}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: Player
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1111,9 +1111,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   moveSpeed: 5
   mouseSensitivity: 15
+  aimingSensitivityRatio: 0.75
   followTarget: {fileID: 1689148638}
   mainCamera: {fileID: 1733753190}
   aimCamera: {fileID: 339268612}
+  enemy: {fileID: 1099616706}
 --- !u!143 &1259356668
 CharacterController:
   m_ObjectHideFlags: 0
@@ -1287,7 +1289,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1689148639}
-  m_Layer: 0
+  m_Layer: 6
   m_Name: FollowTarget
   m_TagString: Untagged
   m_Icon: {fileID: 0}
