@@ -1,14 +1,10 @@
-using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Numerics;
 using Common;
 using EzySlice;
 using UnityEngine;
 using UnityEngine.InputSystem;
-using Plane = UnityEngine.Plane;
 using Quaternion = UnityEngine.Quaternion;
-using Random = UnityEngine.Random;
 using Vector2 = UnityEngine.Vector2;
 using Vector3 = UnityEngine.Vector3;
 
@@ -25,6 +21,7 @@ public class Player : MonoBehaviour {
   
   // todo should not depend directly on enemy
   [SerializeField] private GameObject enemy;
+  [SerializeField] private Material enemyMaterial;
   // todo should not maintain this here
   private List<GameObject> enemies = new List<GameObject>();
   
@@ -215,7 +212,7 @@ public class Player : MonoBehaviour {
   }
 
   private void Slice(GameObject enemyToSlice, Vector3 pointOnPlane, Vector3 planeNormal) {
-    GameObject[] enemyParts = enemyToSlice.SliceInstantiate(pointOnPlane, planeNormal);
+    GameObject[] enemyParts = enemyToSlice.SliceInstantiate(pointOnPlane, planeNormal, enemyMaterial);
     if (enemyParts == null) {
       Debug.LogWarning("Empty parts for slice");
       return;

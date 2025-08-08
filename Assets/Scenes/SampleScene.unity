@@ -1119,6 +1119,7 @@ MonoBehaviour:
   trail: {fileID: 439871433556538751, guid: 85409e85068dc6d49a395a4a23e627d6, type: 3}
   physicsSliceBox: {fileID: 0}
   enemy: {fileID: 1099616706}
+  enemyMaterial: {fileID: 2100000, guid: a7619319c69e3454c9e7dfcc57795804, type: 2}
 --- !u!143 &1259356668
 CharacterController:
   m_ObjectHideFlags: 0
