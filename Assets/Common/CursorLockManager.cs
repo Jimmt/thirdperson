@@ -4,22 +4,30 @@ using UnityEngine.InputSystem;
 public class CursorLockManager : MonoBehaviour {
   [SerializeField] private PlayerInput playerInput;
 
+  private InputAction lockToggleAction;
+
   void Start() {
-    var lockToggleAction = playerInput.actions["Escape"];
-    lockToggleAction.performed += context => {
-      if (Cursor.lockState == CursorLockMode.Locked) {
-        UnlockCursor();
-      } else if (Cursor.lockState == CursorLockMode.None) {
-        LockCursor();
-      }
-    };
+    lockToggleAction = playerInput.actions["Escape"];
+    lockToggleAction.performed += ToggleLock;
     Cursor.lockState = CursorLockMode.Locked;
   }
 
   void OnEnable() => UnlockCursor();
-  void OnDisable() => UnlockCursor();
 
-  public void LockCursor() {
+  void OnDisable() {
+    UnlockCursor();
+    lockToggleAction.performed -= ToggleLock;
+  }
+
+  private void ToggleLock(InputAction.CallbackContext context) {
+    if (Cursor.lockState == CursorLockMode.Locked) {
+      UnlockCursor();
+    } else if (Cursor.lockState == CursorLockMode.None) {
+      LockCursor();
+    }
+  }
+
+  private void LockCursor() {
     if (enabled) {
       Cursor.lockState = CursorLockMode.Locked;
     }

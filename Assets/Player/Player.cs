@@ -1,32 +1,50 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Numerics;
 using Common;
 using EzySlice;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Plane = UnityEngine.Plane;
+using Quaternion = UnityEngine.Quaternion;
+using Random = UnityEngine.Random;
+using Vector2 = UnityEngine.Vector2;
+using Vector3 = UnityEngine.Vector3;
 
 public class Player : MonoBehaviour {
   [SerializeField] private float moveSpeed = 5;
   [SerializeField] private float mouseSensitivity = 15f;
   [SerializeField] private float aimingSensitivityRatio = 0.75f;
   [SerializeField] private GameObject followTarget;
+  [SerializeField] private GameObject gun;
   [SerializeField] private GameObject mainCamera;
   [SerializeField] private GameObject aimCamera;
-
-  // todo this should not be a hard reference
+  [SerializeField] private GameObject trail;
+  [SerializeField] private GameObject physicsSliceBox;
+  
+  // todo should not depend directly on enemy
   [SerializeField] private GameObject enemy;
-
+  // todo should not maintain this here
+  private List<GameObject> enemies = new List<GameObject>();
+  
   private CharacterController charController;
   private InputAction moveAction;
   private InputAction shootAction;
   private InputAction altFireAction;
   private InputAction lookAction;
+  private InputAction switchWeaponAction;
 
   private float verticalVelocity = 0f;
   private float horizontalRotation = 0f;
   private float verticalRotation = 0f;
 
   // TODO: state machine
+  enum Weapon {
+    Gun, Knife
+  }
+
+  private Weapon activeWeapon = Weapon.Gun;
   private bool isAiming = false;
   private Vector3 sliceStart;
   private Vector3 sliceStartDir;
@@ -39,11 +57,14 @@ public class Player : MonoBehaviour {
     shootAction = playerInput.actions["Shoot"];
     altFireAction = playerInput.actions["AlternateFire"];
     lookAction = playerInput.actions["Look"];
+    switchWeaponAction = playerInput.actions["SwitchWeapon"];
   }
 
   void Start() {
     charController = GetComponent<CharacterController>();
     EventController.TriggerAimingStateChanged(isAiming);
+    EventController.TriggerWeaponSelected(activeWeapon.ToString());
+    enemies.Add(enemy);
   }
 
   private void OnEnable() {
@@ -52,6 +73,7 @@ public class Player : MonoBehaviour {
     shootAction.canceled += ShootRelease;
     altFireAction.performed += AltFireDown;
     altFireAction.canceled += AltFireRelease;
+    switchWeaponAction.performed += SwitchWeapon;
   }
 
   private void OnDisable() {
@@ -60,12 +82,12 @@ public class Player : MonoBehaviour {
     shootAction.canceled -= ShootRelease;
     altFireAction.performed -= AltFireDown;
     altFireAction.canceled -= AltFireRelease;
+    switchWeaponAction.performed -= SwitchWeapon;
   }
 
   void Update() {
     float sens = mouseSensitivity * (isAiming ? aimingSensitivityRatio : 1f);
     Vector2 look = lookAction.ReadValue<Vector2>() * (sens * Time.deltaTime);
-    // todo some jitters
     horizontalRotation += look.x;
     verticalRotation -= look.y;
     transform.rotation = Quaternion.Euler(0f, horizontalRotation, 0f);
@@ -104,7 +126,66 @@ public class Player : MonoBehaviour {
     EventController.TriggerAimingStateChanged(isAiming);
   }
 
+  void SwitchWeapon(InputAction.CallbackContext context) {
+    SwitchWeapon();
+  }
+
+  void SwitchWeapon() {
+    if (activeWeapon == Weapon.Gun) {
+      activeWeapon = Weapon.Knife;
+    } else {
+      activeWeapon = Weapon.Gun;
+    }
+    EventController.TriggerWeaponSelected(activeWeapon.ToString());
+  }
+
   void ShootDown(InputAction.CallbackContext context) {
+    if (activeWeapon == Weapon.Knife) {
+      KnifeDown();
+    } else {
+      GunDown();
+    }
+  }
+
+  private Vector3 planeNormal;
+  private Vector3 lastDebugPos;
+
+  void ShootRelease(InputAction.CallbackContext context) {
+    if (activeWeapon == Weapon.Knife) {
+      KnifeRelease();
+    }
+  }
+
+  void GunDown() {
+    if (!isAiming) return;
+    var mainCam = Camera.main;
+    if (mainCam == null) return;
+    
+    RaycastHit hit;
+    var raycastHit = Physics.Raycast(mainCam.transform.position, mainCam.transform.forward, out hit, 400f);
+    Debug.Log(raycastHit);
+    if (raycastHit) {
+      TrailRenderer trailRenderer = Instantiate(trail, gun.transform.position, Quaternion.identity).GetComponent<TrailRenderer>();
+      StartCoroutine(SpawnTrail(trailRenderer, hit));
+    }
+  }
+
+  private IEnumerator SpawnTrail(TrailRenderer trail, RaycastHit hit) {
+    float time = 0;
+    Vector3 startPos = trail.transform.position;
+
+    while (time < 1) {
+      trail.transform.position = Vector3.Lerp(startPos, hit.point, time);
+      time += Time.deltaTime / trail.time;
+      yield return null;
+    }
+
+    trail.transform.position = hit.point;
+    Destroy(trail.gameObject, 0.1f);
+    // todo spawn impact effects
+  }
+
+  void KnifeDown() {
     if (!isAiming) return;
     var mainCam = Camera.main;
     if (mainCam == null) return;
@@ -114,10 +195,7 @@ public class Player : MonoBehaviour {
     sliceStartDir = sliceStart - pos;
   }
 
-  private Vector3 planeNormal;
-  private Vector3 lastDebugPos;
-
-  void ShootRelease(InputAction.CallbackContext context) {
+  void KnifeRelease() {
     if (!isAiming) return;
     var mainCam = Camera.main;
     if (mainCam == null) return;
@@ -129,18 +207,29 @@ public class Player : MonoBehaviour {
 
     planeNormal = Vector3.Cross(sliceStartDir, sliceEndDir).normalized;
     Vector3 pointOnPlane = pos;
-    Plane slicePlane = new Plane(planeNormal, pointOnPlane);
-    
-    GameObject[] enemyParts = enemy.SliceInstantiate(pointOnPlane, planeNormal);
+
+    var enemiesCopy = new List<GameObject>(enemies);
+    foreach (var e in enemiesCopy) {
+      Slice(e, pointOnPlane, planeNormal);
+    }
+  }
+
+  private void Slice(GameObject enemyToSlice, Vector3 pointOnPlane, Vector3 planeNormal) {
+    GameObject[] enemyParts = enemyToSlice.SliceInstantiate(pointOnPlane, planeNormal);
     if (enemyParts == null) {
       Debug.LogWarning("Empty parts for slice");
       return;
     }
-    enemy.SetActive(false);
+    // enemy.SetActive(false);
+    enemies.Remove(enemyToSlice);
+    Destroy(enemyToSlice);
     for (int i = 0; i < enemyParts.Length; i++) {
-      var slice = enemyParts[i];
-      slice.AddComponent<MeshCollider>().convex = true;
-      var rb = slice.AddComponent<Rigidbody>();
+      // for further sub-slicing of parts
+      var part = enemyParts[i];
+      enemies.Add(part);
+      part.layer = 7; // [Enemy] todo use a constant
+      part.AddComponent<MeshCollider>().convex = true;
+      var rb = part.AddComponent<Rigidbody>();
       
       Vector3 frontForce = (rb.position - mainCamera.transform.position) * 0.5f;
       Vector3 force = frontForce;
