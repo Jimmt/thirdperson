@@ -33,6 +33,7 @@ public class Player : MonoBehaviour {
   private InputAction altFireAction;
   private InputAction lookAction;
   private InputAction switchWeaponAction;
+  private SlashEffectGenerator slashEffectGenerator;
 
   private float verticalVelocity = 0f;
   private float horizontalRotation = 0f;
@@ -58,6 +59,7 @@ public class Player : MonoBehaviour {
     altFireAction = playerInput.actions["AlternateFire"];
     lookAction = playerInput.actions["Look"];
     switchWeaponAction = playerInput.actions["SwitchWeapon"];
+    slashEffectGenerator = GetComponent<SlashEffectGenerator>();
   }
 
   void Start() {
@@ -209,6 +211,12 @@ public class Player : MonoBehaviour {
 
     planeNormal = Vector3.Cross(sliceStartDir, sliceEndDir).normalized;
     Vector3 pointOnPlane = pos;
+
+    Vector3 sliceMiddle = (sliceEnd + sliceStart) / 2;
+    Vector3 slashEffectStart = mainCam.transform.position;
+    Vector3 slashTilt = Vector3.Cross(mainCam.transform.position, sliceEnd - sliceStart);
+    slashEffectGenerator.SpawnSlash(slashEffectStart, Quaternion.LookRotation(mainCam.transform.forward, slashTilt),
+      sliceMiddle - slashEffectStart);
 
     var enemiesCopy = new List<GameObject>(enemies);
     foreach (var e in enemiesCopy) {
