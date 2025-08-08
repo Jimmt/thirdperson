@@ -18,13 +18,15 @@ public class Player : MonoBehaviour {
   [SerializeField] private GameObject aimCamera;
   [SerializeField] private GameObject trail;
   [SerializeField] private GameObject physicsSliceBox;
-  
+
   // todo should not depend directly on enemy
   [SerializeField] private GameObject enemy;
+
   [SerializeField] private Material enemyMaterial;
+
   // todo should not maintain this here
   private List<GameObject> enemies = new List<GameObject>();
-  
+
   private CharacterController charController;
   private InputAction moveAction;
   private InputAction shootAction;
@@ -38,7 +40,8 @@ public class Player : MonoBehaviour {
 
   // TODO: state machine
   enum Weapon {
-    Gun, Knife
+    Gun,
+    Knife
   }
 
   private Weapon activeWeapon = Weapon.Gun;
@@ -133,6 +136,7 @@ public class Player : MonoBehaviour {
     } else {
       activeWeapon = Weapon.Gun;
     }
+
     EventController.TriggerWeaponSelected(activeWeapon.ToString());
   }
 
@@ -157,27 +161,28 @@ public class Player : MonoBehaviour {
     if (!isAiming) return;
     var mainCam = Camera.main;
     if (mainCam == null) return;
-    
+
     RaycastHit hit;
-    var raycastHit = Physics.Raycast(mainCam.transform.position, mainCam.transform.forward, out hit, 400f);
+    float maxDist = 40f;
+    var raycastHit = Physics.Raycast(mainCam.transform.position, mainCam.transform.forward, out hit, maxDist);
     Debug.Log(raycastHit);
-    if (raycastHit) {
-      TrailRenderer trailRenderer = Instantiate(trail, gun.transform.position, Quaternion.identity).GetComponent<TrailRenderer>();
-      StartCoroutine(SpawnTrail(trailRenderer, hit));
-    }
+    Vector3 endPosition = raycastHit ? hit.point : (mainCam.transform.position + mainCam.transform.forward * maxDist);
+    TrailRenderer trailRenderer =
+      Instantiate(trail, gun.transform.position, Quaternion.identity).GetComponent<TrailRenderer>();
+    StartCoroutine(SpawnTrail(trailRenderer, endPosition));
   }
 
-  private IEnumerator SpawnTrail(TrailRenderer trail, RaycastHit hit) {
+  private IEnumerator SpawnTrail(TrailRenderer trail, Vector3 endPosition) {
     float time = 0;
     Vector3 startPos = trail.transform.position;
 
     while (time < 1) {
-      trail.transform.position = Vector3.Lerp(startPos, hit.point, time);
+      trail.transform.position = Vector3.Lerp(startPos, endPosition, time);
       time += Time.deltaTime / trail.time;
       yield return null;
     }
 
-    trail.transform.position = hit.point;
+    trail.transform.position = endPosition;
     Destroy(trail.gameObject, 0.1f);
     // todo spawn impact effects
   }
@@ -186,7 +191,7 @@ public class Player : MonoBehaviour {
     if (!isAiming) return;
     var mainCam = Camera.main;
     if (mainCam == null) return;
-    
+
     Vector3 pos = aimCamera.transform.position;
     sliceStart = mainCam.ScreenToWorldPoint(new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 7f));
     sliceStartDir = sliceStart - pos;
@@ -196,7 +201,7 @@ public class Player : MonoBehaviour {
     if (!isAiming) return;
     var mainCam = Camera.main;
     if (mainCam == null) return;
-    
+
     Vector3 pos = mainCam.transform.position;
     lastDebugPos = pos;
     sliceEnd = mainCam.ScreenToWorldPoint(new Vector3(Screen.width * 0.5f, Screen.height * 0.5f, 7f));
@@ -217,6 +222,7 @@ public class Player : MonoBehaviour {
       Debug.LogWarning("Empty parts for slice");
       return;
     }
+
     // enemy.SetActive(false);
     enemies.Remove(enemyToSlice);
     Destroy(enemyToSlice);
@@ -227,19 +233,22 @@ public class Player : MonoBehaviour {
       part.layer = 7; // [Enemy] todo use a constant
       part.AddComponent<MeshCollider>().convex = true;
       var rb = part.AddComponent<Rigidbody>();
-      
+
       Vector3 frontForce = (rb.position - mainCamera.transform.position) * 0.5f;
       Vector3 force = frontForce;
       float verticalScalar = 2f;
       // var isPositiveSide = slicePlane.GetSide(rb.position); rb.position is identical for parts for some reason (takes a frame?)
-      if (i == 0) { // Above plane
+      if (i == 0) {
+        // Above plane
         force += planeNormal * verticalScalar;
-      } else if (i == 1) { // Below plane
+      } else if (i == 1) {
+        // Below plane
         force = -planeNormal * verticalScalar;
       }
+
       Debug.Log((i == 0) + " part_position=" + rb.position + " normal=" + planeNormal);
       Debug.Log("[" + i + "] = " + force);
-      
+
       rb.AddForce(force, ForceMode.Impulse);
     }
   }
